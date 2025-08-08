@@ -1,0 +1,49 @@
+<!-- Place this in: ~/catkin_ws/src/wall_scanner/launch/wall_scanner.launch -->
+<launch>
+    <!-- Wall Scanner ROS Package Launch File -->
+    
+    <!-- Parameters -->
+    <rosparam param="/wall_scanner/scan_rate">10.0</rosparam>
+    <rosparam param="/wall_scanner/em_wire_threshold">5.0</rosparam>
+    <rosparam param="/wall_scanner/cap_object_threshold">15.0</rosparam>
+    <rosparam param="/wall_scanner/confidence_threshold">0.7</rosparam>
+    
+    <!-- Electromagnetic Sensor Node -->
+    <node name="electromagnetic_sensor" pkg="wall_scanner" type="electromagnetic_sensor_node.py" output="screen">
+        <param name="scan_rate" value="10.0"/>
+        <param name="baseline_field" value="0.1"/>
+        <param name="noise_level" value="0.05"/>
+    </node>
+    
+    <!-- Capacitive Sensor Node -->
+    <node name="capacitive_sensor" pkg="wall_scanner" type="capacitive_sensor_node.py" output="screen">
+        <param name="scan_rate" value="10.0"/>
+        <param name="baseline_capacitance" value="12.5"/>
+        <param name="noise_level" value="0.3"/>
+        <param name="num_sensors" value="3"/>
+    </node>
+    
+    <!-- Detection Fusion Node -->
+    <node name="detection_fusion" pkg="wall_scanner" type="detection_fusion_node.py" output="screen">
+        <param name="em_wire_threshold" value="5.0"/>
+        <param name="cap_object_threshold" value="15.0"/>
+        <param name="confidence_threshold" value="0.7"/>
+    </node>
+    
+    <!-- Visualization Node -->
+    <node name="visualization" pkg="wall_scanner" type="visualization_node.py" output="screen"/>
+    
+    <!-- Wall Simulator Node -->
+    <node name="wall_simulator" pkg="wall_scanner" type="wall_simulator_node.py" output="screen">
+        <param name="scan_duration" value="30.0"/>
+        <param name="auto_scan" value="true"/>
+        <param name="scan_interval" value="35.0"/>
+    </node>
+    
+    <!-- RViz for Visualization -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find wall_scanner)/config/wall_scanner.rviz" required="false"/>
+    
+    <!-- Optional: RQT Graph for monitoring -->
+    <node name="rqt_graph" pkg="rqt_graph" type="rqt_graph" required="false"/>
+    
+</launch>
