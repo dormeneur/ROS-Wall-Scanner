@@ -1,6 +1,11 @@
 # Wall Scanner Bot
 ROS project to detect water pipelines and electric wires in any wall.
 
+<img width="300" height="250" alt="Screenshot 2025-08-07 225639" src="https://github.com/user-attachments/assets/51e349b5-c19a-4014-afa9-a270d6e03503" />
+<img width="300" height="250" alt="Screenshot 2025-08-07 225535" src="https://github.com/user-attachments/assets/0dc28bf3-18bc-46ea-9113-47f151dc276a" />
+<img width="300" height="250" alt="Screenshot 2025-08-07 225554" src="https://github.com/user-attachments/assets/cd340106-82fb-4c19-8acb-fabecd5b4554" />
+
+
 # Wall Scanner ROS Setup Instructions
 
 ## 1. Prerequisites
