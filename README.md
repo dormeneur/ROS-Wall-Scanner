@@ -154,8 +154,8 @@ roslaunch wall_scanner wall_scanner.launch
 
 - [Setup Instructions](SETUP_INSTRUCTIONS.md)
 - [Concept PDF](CONCEPT.pdf)
-- [API Reference](docs/API.md)
-- [Hardware Guide](docs/HARDWARE.md)
+- [API Reference](API.md)
+- [Hardware Guide](HARDWARE.md)
 
 ## Contributing
 
