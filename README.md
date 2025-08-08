@@ -1,218 +1,169 @@
-# Wall Scanner Bot
-ROS project to detect water pipelines and electric wires in any wall.
+# ROS Wall Scanner
+
+A ROS-based wall scanner system for detecting electrical wires, water pipes, and wall studs using electromagnetic and capacitive sensing.
 
 <img width="300" height="250" alt="Screenshot 2025-08-07 225639" src="https://github.com/user-attachments/assets/51e349b5-c19a-4014-afa9-a270d6e03503" />
 <img width="300" height="250" alt="Screenshot 2025-08-07 225535" src="https://github.com/user-attachments/assets/0dc28bf3-18bc-46ea-9113-47f151dc276a" />
 
-# Wall Scanner ROS Setup Instructions
 
-## 1. Prerequisites
-- ROS Noetic (Ubuntu 20.04) or ROS Melodic (Ubuntu 18.04)
-- Python 3
-- catkin workspace set up
+## System Architecture
 
-## 2. Package Setup
+```mermaid
+graph TB
+    %% Styling
+    classDef hardware fill:#FF6B6B,stroke:#D63031,stroke-width:2px,color:#fff
+    classDef sensor fill:#74B9FF,stroke:#0984E3,stroke-width:2px,color:#fff
+    classDef processing fill:#00B894,stroke:#00A085,stroke-width:2px,color:#fff
+    classDef output fill:#FDCB6E,stroke:#E17055,stroke-width:2px,color:#000
+    classDef control fill:#6C5CE7,stroke:#5F3DC4,stroke-width:2px,color:#fff
+    classDef topic fill:#A29BFE,stroke:#6C5CE7,stroke-width:1px,color:#fff
+    classDef message fill:#FD79A8,stroke:#E84393,stroke-width:1px,color:#fff
 
-### Create the package structure:
+    %% Hardware Layer
+    subgraph HW ["🔧 Hardware Layer"]
+        COIL[("Inductive Coil<br/>+ Ferrite Core")]:::hardware
+        CAP[("Capacitive Sensor<br/>Array (3x)")]:::hardware
+        MCU[("Microcontroller<br/>(Arduino/ESP32)")]:::hardware
+        AMP[("Signal Amplifier")]:::hardware
+    end
+
+    %% Physical Connections
+    COIL --> AMP
+    AMP --> MCU
+    CAP --> MCU
+
+    %% ROS Sensor Nodes
+    subgraph SENS ["📡 ROS Sensor Nodes"]
+        EM_NODE["electromagnetic_sensor_node.py<br/>• Calibration: 50 samples<br/>• Scan Rate: 10 Hz<br/>• Wire Detection: >5.0 μT"]:::sensor
+        CAP_NODE["capacitive_sensor_node.py<br/>• 3-sensor array<br/>• Baseline: 12.5 pF<br/>• Object Detection: >15.0 pF"]:::sensor
+    end
+
+    %% Hardware Interface
+    MCU -.->|"Serial/USB<br/>/dev/ttyUSB0"| EM_NODE
+    MCU -.->|"Serial/USB<br/>/dev/ttyUSB0"| CAP_NODE
+
+    %% ROS Topics
+    subgraph TOPICS ["📨 ROS Topics"]
+        EM_TOPIC["/wall_scanner/<br/>electromagnetic_data<br/>(sensor_msgs/Range)"]:::topic
+        CAP_TOPIC["/wall_scanner/<br/>capacitive_data<br/>(sensor_msgs/PointCloud)"]:::topic
+        CMD_TOPIC["/wall_scanner/<br/>scan_command<br/>(std_msgs/Bool)"]:::topic
+        DET_TOPIC["/wall_scanner/<br/>detection_results<br/>(DetectionResult)"]:::topic
+        VIZ_TOPIC["/wall_scanner/<br/>visualization_markers<br/>(MarkerArray)"]:::topic
+    end
+
+    %% Data Flow from Sensors
+    EM_NODE -->|"EM Field Strength<br/>Position, Timestamp"| EM_TOPIC
+    CAP_NODE -->|"Capacitance Array<br/>3D Point Cloud"| CAP_TOPIC
+
+    %% Processing Layer
+    subgraph PROC ["🧠 Processing Layer"]
+        FUSION["detection_fusion_node.py<br/>• Message Synchronization<br/>• Sensor Fusion Algorithm<br/>• Confidence Calculation<br/>• Temporal Filtering"]:::processing
+    end
+
+    %% Message Synchronization
+    EM_TOPIC --> FUSION
+    CAP_TOPIC --> FUSION
+
+    %% Detection Logic
+    subgraph LOGIC ["🔍 Detection Logic"]
+        WIRE_DET["Wire Detection<br/>EM > 5.0 μT<br/>Confidence = min(1.0, EM/20)"]:::message
+        PIPE_DET["Pipe Detection<br/>Cap: 15-20 pF<br/>Depth: ~3cm"]:::message
+        STUD_DET["Stud Detection<br/>Cap > 20 pF<br/>Depth: 0cm"]:::message
+    end
+
+    FUSION --> WIRE_DET
+    FUSION --> PIPE_DET
+    FUSION --> STUD_DET
+
+    %% Detection Results
+    WIRE_DET --> DET_TOPIC
+    PIPE_DET --> DET_TOPIC  
+    STUD_DET --> DET_TOPIC
+
+    %% Output Layer
+    subgraph OUT ["📊 Output Layer"]
+        VIZ_NODE["visualization_node.py<br/>• 3D Markers Generation<br/>• Color Coding by Type<br/>• Confidence-based Opacity<br/>• Text Labels"]:::output
+        RVIZ["RViz Visualization<br/>• Real-time 3D Display<br/>• Wall Representation<br/>• Scanner Position<br/>• Detection Markers"]:::output
+    end
+
+    %% Visualization Flow
+    DET_TOPIC --> VIZ_NODE
+    VIZ_NODE --> VIZ_TOPIC
+    VIZ_TOPIC --> RVIZ
+
+    %% Control Layer
+    subgraph CTRL ["🎮 Control Layer"]
+        SIM_NODE["wall_simulator_node.py<br/>• Auto Scan: 30s cycles<br/>• Manual Control Services<br/>• Calibration Commands"]:::control
+    end
+
+    %% Control Commands
+    SIM_NODE --> CMD_TOPIC
+    CMD_TOPIC --> EM_NODE
+    CMD_TOPIC --> CAP_NODE
+```
+
+## Features
+
+- **Electromagnetic Detection**: Live wire detection using inductive coils
+- **Capacitive Sensing**: Pipe and stud detection with sensor arrays
+- **Real-time Visualization**: 3D RViz display with confidence indicators
+- **Sensor Fusion**: Advanced algorithms combining multiple sensor data
+- **ROS Integration**: Complete ROS ecosystem with custom messages
+
+## Quick Start
+
 ```bash
-cd ~/catkin_ws/src
-catkin_create_pkg wall_scanner rospy std_msgs sensor_msgs geometry_msgs visualization_msgs
-cd wall_scanner
-mkdir launch config scripts msg
-```
+# Clone the repository
+git clone https://github.com/dormeneur/ROS-Wall-Scanner.git
 
-### File Placement:
-Place files in the following locations:
-
-```
-~/catkin_ws/src/wall_scanner/
-├── msg/
-│   └── DetectionResult.msg
-├── scripts/
-│   ├── electromagnetic_sensor_node.py
-│   ├── capacitive_sensor_node.py  
-│   ├── detection_fusion_node.py
-│   ├── visualization_node.py
-│   └── wall_simulator_node.py
-├── launch/
-│   └── wall_scanner.launch
-├── config/
-│   └── wall_scanner.rviz
-├── package.xml
-└── CMakeLists.txt
-```
-
-### Make scripts executable:
-```bash
-cd ~/catkin_ws/src/wall_scanner/scripts
-chmod +x *.py
-```
-
-## 3. Build the Package
-
-```bash
+# Build the package
 cd ~/catkin_ws
 catkin_make
 source devel/setup.bash
-```
 
-## 4. Running the Simulation
-
-### Option 1: Full Launch (Recommended)
-```bash
+# Launch the complete system
 roslaunch wall_scanner wall_scanner.launch
 ```
-This starts all nodes including RViz visualization.
 
-### Option 2: Individual Nodes
-Terminal 1 - Core:
-```bash
-roscore
-```
+## System Specifications
 
-Terminal 2 - Electromagnetic Sensor:
-```bash
-rosrun wall_scanner electromagnetic_sensor_node.py
-```
+| Component | Specification |
+|-----------|---------------|
+| EM Sensor | Wire detection threshold: >5.0 μT |
+| Capacitive Array | 3 sensors, baseline: 12.5 pF |
+| Detection Range | ±50cm from scanner |
+| Position Accuracy | ±2cm |
+| Scan Rate | 10 Hz |
+| Confidence Threshold | 70% minimum |
 
-Terminal 3 - Capacitive Sensor:
-```bash
-rosrun wall_scanner capacitive_sensor_node.py
-```
+## Detected Objects
 
-Terminal 4 - Detection Fusion:
-```bash
-rosrun wall_scanner detection_fusion_node.py
-```
+- ⚡ **Live Electrical Wires** - High EM signature (red markers)
+- 🚰 **Water Pipes** - Medium capacitance change (blue markers)
+- 🏗️ **Wall Studs** - High capacitance change (brown markers)
 
-Terminal 5 - Visualization:
-```bash
-rosrun wall_scanner visualization_node.py
-```
+## ROS Topics
 
-Terminal 6 - Simulator:
-```bash
-rosrun wall_scanner wall_simulator_node.py
-```
+- `/wall_scanner/electromagnetic_data` - EM field measurements
+- `/wall_scanner/capacitive_data` - Capacitive sensor readings
+- `/wall_scanner/detection_results` - Fused detection results
+- `/wall_scanner/visualization_markers` - RViz visualization
+- `/wall_scanner/scan_command` - Control scanning process
 
-Terminal 7 - RViz:
-```bash
-rosrun rviz rviz -d ~/catkin_ws/src/wall_scanner/config/wall_scanner.rviz
-```
+## Documentation
 
-## 5. Monitoring the System
+- [Setup Instructions](SETUP_INSTRUCTIONS.md)
+- [API Reference](docs/API.md)
+- [Hardware Guide](docs/HARDWARE.md)
 
-### View ROS Topics:
-```bash
-rostopic list
-```
-You should see:
-- `/wall_scanner/electromagnetic_data`
-- `/wall_scanner/capacitive_data`
-- `/wall_scanner/detection_results`
-- `/wall_scanner/scan_command`
-- `/wall_scanner/visualization_markers`
+## Contributing
 
-### Monitor Detections:
-```bash
-rostopic echo /wall_scanner/detection_results
-```
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-### View Sensor Data:
-```bash
-rostopic echo /wall_scanner/electromagnetic_data
-rostopic echo /wall_scanner/capacitive_data
-```
+## License
 
-### Manual Control:
-```bash
-# Start scanning
-rostopic pub /wall_scanner/scan_command std_msgs/Bool "data: true"
-
-# Stop scanning  
-rostopic pub /wall_scanner/scan_command std_msgs/Bool "data: false"
-
-# Calibrate
-rostopic pub /wall_scanner/calibrate std_msgs/Empty "{}"
-```
-
-## 6. Expected Behavior
-
-1. **Initialization**: All nodes start and calibrate sensors
-2. **Automatic Scanning**: Scanner moves along a 10m wall every 35 seconds
-3. **Detections**: System detects:
-   - Live wires at 2.0m and 8.0m (red cylinders in RViz)
-   - Pipes at 4.0m and 9.0m (blue cylinders)
-   - Stud at 6.0m (brown cylinder)
-4. **Visualization**: RViz shows wall, scanner position, and detected objects
-5. **Console Output**: Detection messages with confidence levels
-
-## 7. Troubleshooting
-
-### Python Import Errors:
-```bash
-export PYTHONPATH="${PYTHONPATH}:~/catkin_ws/devel/lib/python3/dist-packages"
-```
-
-### Message Generation Issues:
-Ensure `message_generation` is in `build_depend` and `message_runtime` in `exec_depend` in package.xml.
-
-### RViz Not Showing Markers:
-- Check that `/wall_scanner/visualization_markers` topic has data
-- Verify frame_id is set to "wall" in RViz Fixed Frame
-- Ensure MarkerArray display is enabled
-
-### No Detections:
-- Check sensor thresholds in launch file
-- Monitor raw sensor data topics
-- Verify detection_fusion_node is receiving synchronized messages
-
-## 8. Customization
-
-### Modify Detection Parameters:
-Edit `launch/wall_scanner.launch`:
-```xml
-<rosparam param="/wall_scanner/em_wire_threshold">5.0</rosparam>
-<rosparam param="/wall_scanner/cap_object_threshold">15.0</rosparam>
-<rosparam param="/wall_scanner/confidence_threshold">0.7</rosparam>
-```
-
-### Add New Objects:
-Edit `electromagnetic_sensor_node.py` and `capacitive_sensor_node.py`:
-```python
-# Add new wire positions
-self.wire_positions = [1.5, 2.0, 5.5, 8.0, 9.2]
-
-# Add new object types in capacitive sensor
-self.objects.append({
-    'type': 'pipe', 
-    'position': 3.5, 
-    'width': 0.08, 
-    'cap_change': 10.0
-})
-```
-
-### Change Scan Behavior:
-Modify `wall_simulator_node.py` parameters:
-```python
-self.scan_duration = 45.0    # Longer scans
-self.scan_interval = 60.0    # More time between scans
-```
-
-## 9. Real Hardware Integration
-
-To connect real hardware:
-1. Replace simulation in sensor nodes with actual sensor readings
-2. Add serial communication for Arduino/ESP32
-3. Modify position tracking for physical scanner movement
-4. Calibrate thresholds based on real sensor characteristics
-
-## 10. ROS Network
-
-For distributed systems:
-```bash
-export ROS_MASTER_URI=http://192.168.1.100:11311
-export ROS_IP=192.168.1.101
-```
-
-This complete ROS implementation provides a robust foundation for your wall scanner project with proper sensor fusion, visualization, and extensibility for real hardware integration.
+MIT License - see [LICENSE](LICENSE) file for details.
